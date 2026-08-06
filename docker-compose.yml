@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  analytics-suite-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: business_growth_analytics_suite
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-enterprise_growth_analytics_secret_key_2026}
+      - JWT_ALGORITHM=HS256
+      - ENVIRONMENT=production
+    volumes:
+      - analytics_data:/app/data
+      - analytics_models:/app/ml/models
+      - analytics_reports:/app/reports
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  analytics_data:
+  analytics_models:
+  analytics_reports:
