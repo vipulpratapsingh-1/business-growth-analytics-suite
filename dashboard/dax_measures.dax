@@ -1,0 +1,126 @@
+// ============================================================
+// Power BI DAX Measures Library - Business Growth Analytics Suite
+// Production DAX Code Library for Power BI Desktop
+// ============================================================
+
+// ------------------------------------------------------------
+// 1. CORE EXECUTIVE KPI MEASURES
+// ------------------------------------------------------------
+
+[Total Revenue] = 
+SUM(Sales[sales_amount])
+
+[Total Profit] = 
+SUM(Sales[profit_amount])
+
+[Total Orders] = 
+DISTINCTCOUNT(Orders[order_id])
+
+[Total Customers] = 
+DISTINCTCOUNT(Customers[customer_id])
+
+[Total Units Sold] = 
+SUM(Sales[quantity])
+
+[Overall Profit Margin %] = 
+DIVIDE([Total Profit], [Total Revenue], 0) * 100
+
+[Average Order Value (AOV)] = 
+DIVIDE([Total Revenue], [Total Orders], 0)
+
+[Average Discount Rate %] = 
+AVERAGE(Sales[discount]) * 100
+
+// ------------------------------------------------------------
+// 2. TIME INTELLIGENCE & COMPARISON MEASURES
+// ------------------------------------------------------------
+
+[Revenue YTD] = 
+TOTALYTD([Total Revenue], Dim_Date[Date])
+
+[Profit YTD] = 
+TOTALYTD([Total Profit], Dim_Date[Date])
+
+[Prior Year Revenue (PY)] = 
+CALCULATE([Total Revenue], SAMEPERIODLASTYEAR(Dim_Date[Date]))
+
+[YoY Revenue Growth %] = 
+VAR CurrentRevenue = [Total Revenue]
+VAR PreviousRevenue = [Prior Year Revenue (PY)]
+RETURN
+DIVIDE(CurrentRevenue - PreviousRevenue, PreviousRevenue, 0) * 100
+
+[Cumulative Running Revenue] = 
+CALCULATE(
+    [Total Revenue],
+    FILTER(
+        ALLSELECTED(Dim_Date),
+        Dim_Date[Date] <= MAX(Dim_Date[Date])
+    )
+)
+
+[3-Month Moving Average Revenue] = 
+AVERAGEX(
+    DATESINPERIOD(Dim_Date[Date], MAX(Dim_Date[Date]), -3, MONTH),
+    [Total Revenue]
+)
+
+// ------------------------------------------------------------
+// 3. CUSTOMER INTELLIGENCE MEASURES
+// ------------------------------------------------------------
+
+[Avg Customer Lifetime Value (CLV)] = 
+DIVIDE([Total Revenue], [Total Customers], 0)
+
+[Repeat Customers Count] = 
+CALCULATE(
+    [Total Customers],
+    FILTER(
+        Customers,
+        CALCULATE(COUNT(Orders[order_id])) > 1
+    )
+)
+
+[Repeat Customer Rate %] = 
+DIVIDE([Repeat Customers Count], [Total Customers], 0) * 100
+
+[Single Purchase Customers] = 
+[Total Customers] - [Repeat Customers Count]
+
+// ------------------------------------------------------------
+// 4. FINANCIAL & MARGIN SEGMENTATION MEASURES
+// ------------------------------------------------------------
+
+[Revenue High Discount (>15%)] = 
+CALCULATE(
+    [Total Revenue],
+    Sales[discount] > 0.15
+)
+
+[Profit High Discount (>15%)] = 
+CALCULATE(
+    [Total Profit],
+    Sales[discount] > 0.15
+)
+
+[High Discount Margin %] = 
+DIVIDE([Profit High Discount (>15%)], [Revenue High Discount (>15%)], 0) * 100
+
+[Technology Category Revenue] = 
+CALCULATE([Total Revenue], Products[category] = "Technology")
+
+[Office Supplies Category Revenue] = 
+CALCULATE([Total Revenue], Products[category] = "Office Supplies")
+
+[Furniture Category Revenue] = 
+CALCULATE([Total Revenue], Products[category] = "Furniture")
+
+// ------------------------------------------------------------
+// 5. DRILL-THROUGH & TOOLTIP SUMMARY TITLE MEASURES
+// ------------------------------------------------------------
+
+[Dynamic Header Title] = 
+"Executive Summary - " & SELECTEDVALUE(Dim_Date[Year], "All Years") & " (" & SELECTEDVALUE(Orders[state], "All States") & ")"
+
+[Customer Tooltip Spend] = 
+FORMAT([Total Revenue], "₹#,##0") & " | Orders: " & FORMAT([Total Orders], "#,##0")
