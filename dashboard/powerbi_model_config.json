@@ -1,0 +1,96 @@
+{
+  "model_name": "BusinessGrowthDB_StarSchema",
+  "data_sources": [
+    {
+      "name": "SQLite_Production_DB",
+      "connection": "data/BusinessGrowthDB.sqlite",
+      "type": "DirectQuery / Import"
+    },
+    {
+      "name": "Clean_CSV_Dataset",
+      "connection": "data/clean_sales_data.csv",
+      "type": "Import"
+    }
+  ],
+  "tables": [
+    {
+      "name": "Fact_Sales",
+      "type": "Fact Table",
+      "columns": ["sales_id", "order_id", "product_id", "quantity", "unit_price", "discount", "sales_amount", "profit_amount"]
+    },
+    {
+      "name": "Dim_Customer",
+      "type": "Dimension Table",
+      "columns": ["customer_id", "customer_name"]
+    },
+    {
+      "name": "Dim_Product",
+      "type": "Dimension Table",
+      "columns": ["product_id", "product_name", "category"]
+    },
+    {
+      "name": "Dim_Orders",
+      "type": "Dimension Table",
+      "columns": ["order_id", "order_date", "customer_id", "city", "state"]
+    },
+    {
+      "name": "Dim_Payments",
+      "type": "Dimension Table",
+      "columns": ["payment_id", "order_id", "payment_method", "transaction_amount"]
+    },
+    {
+      "name": "Dim_Date",
+      "type": "Date Table (DAX CALENDAR)",
+      "columns": ["Date", "Year", "Quarter", "Month", "MonthName", "DayOfWeek", "YearMonth"]
+    }
+  ],
+  "relationships": [
+    {
+      "from_table": "Fact_Sales",
+      "from_column": "order_id",
+      "to_table": "Dim_Orders",
+      "to_column": "order_id",
+      "cardinality": "ManyToOne",
+      "cross_filtering": "Single"
+    },
+    {
+      "from_table": "Fact_Sales",
+      "from_column": "product_id",
+      "to_table": "Dim_Product",
+      "to_column": "product_id",
+      "cardinality": "ManyToOne",
+      "cross_filtering": "Single"
+    },
+    {
+      "from_table": "Dim_Orders",
+      "from_column": "customer_id",
+      "to_table": "Dim_Customer",
+      "to_column": "customer_id",
+      "cardinality": "ManyToOne",
+      "cross_filtering": "Single"
+    },
+    {
+      "from_table": "Dim_Payments",
+      "from_column": "order_id",
+      "to_table": "Dim_Orders",
+      "to_column": "order_id",
+      "cardinality": "ManyToOne",
+      "cross_filtering": "Both"
+    },
+    {
+      "from_table": "Dim_Orders",
+      "from_column": "order_date",
+      "to_table": "Dim_Date",
+      "to_column": "Date",
+      "cardinality": "ManyToOne",
+      "cross_filtering": "Single"
+    }
+  ],
+  "pages": [
+    { "page_number": 1, "name": "Executive Overview" },
+    { "page_number": 2, "name": "Sales Analytics" },
+    { "page_number": 3, "name": "Customer Analytics" },
+    { "page_number": 4, "name": "Financial Analytics" },
+    { "page_number": 5, "name": "Interactive Dashboard" }
+  ]
+}
