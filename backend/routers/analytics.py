@@ -16,6 +16,18 @@ from backend.auth import get_current_user, require_role
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics & BI Engine"])
 
+# Global in-memory DataFrame cache for ultra-fast startup and response times
+_CACHED_DF: Optional[pd.DataFrame] = None
+
+def get_clean_dataframe() -> pd.DataFrame:
+    """Returns cached clean sales DataFrame, loading from CSV on first access."""
+    global _CACHED_DF
+    if _CACHED_DF is None:
+        if not config.CLEAN_DATASET_PATH.exists():
+            raise HTTPException(status_code=404, detail="Clean dataset missing. Run data cleaning pipeline.")
+        _CACHED_DF = pd.read_csv(config.CLEAN_DATASET_PATH)
+    return _CACHED_DF
+
 class SQLQueryRequest(BaseModel):
     sql_query: str
 
@@ -36,18 +48,16 @@ def get_db_connection():
 @router.get("/executive")
 def get_executive_summary(current_user: dict = Depends(get_current_user)):
     """Returns top-level executive KPIs and monthly trends."""
-    if not config.CLEAN_DATASET_PATH.exists():
-        raise HTTPException(status_code=404, detail="Clean dataset missing. Run data cleaning pipeline.")
-    
-    df = pd.read_csv(config.CLEAN_DATASET_PATH)
+    df = get_clean_dataframe()
     total_sales = float(df["Sales"].sum())
     total_profit = float(df["Profit"].sum())
     total_orders = int(len(df))
     total_customers = int(df["Customer ID"].nunique())
     profit_margin = float((total_profit / total_sales) * 100)
 
-    df["YearMonth"] = pd.to_datetime(df["Order Date"]).dt.to_period("M").astype(str)
-    monthly = df.groupby("YearMonth")[["Sales", "Profit"]].sum().reset_index()
+    df_monthly = df.copy()
+    df_monthly["YearMonth"] = pd.to_datetime(df_monthly["Order Date"]).dt.to_period("M").astype(str)
+    monthly = df_monthly.groupby("YearMonth")[["Sales", "Profit"]].sum().reset_index()
 
     return {
         "status": "success",
@@ -65,7 +75,7 @@ def get_executive_summary(current_user: dict = Depends(get_current_user)):
 @router.get("/sales")
 def get_sales_analytics(current_user: dict = Depends(get_current_user)):
     """Returns detailed sales breakdowns by Category, State, City, and Products."""
-    df = pd.read_csv(config.CLEAN_DATASET_PATH)
+    df = get_clean_dataframe()
 
     cat_sales = df.groupby("Category").agg(
         total_sales=("Sales", "sum"),
@@ -89,7 +99,7 @@ def get_sales_analytics(current_user: dict = Depends(get_current_user)):
 @router.get("/customers")
 def get_customer_analytics(current_user: dict = Depends(get_current_user)):
     """Returns customer retention, CLV tiers, and RFM distributions."""
-    df = pd.read_csv(config.CLEAN_DATASET_PATH)
+    df = get_clean_dataframe()
 
     cust_summary = df.groupby("Customer ID").agg(
         total_spent=("Sales", "sum"),
@@ -114,7 +124,7 @@ def get_customer_analytics(current_user: dict = Depends(get_current_user)):
 @router.get("/financials")
 def get_financial_analytics(current_user: dict = Depends(get_current_user)):
     """Returns discount profitability impact and payment method market share."""
-    df = pd.read_csv(config.CLEAN_DATASET_PATH)
+    df = get_clean_dataframe().copy()
 
     df["Disc_Bin"] = pd.cut(df["Discount"], bins=[-0.01, 0.0, 0.10, 0.20, 1.0], labels=["0% (No Discount)", "1-10% (Low)", "11-20% (Medium)", ">20% (High)"])
     disc_summary = df.groupby("Disc_Bin", observed=False).agg(
