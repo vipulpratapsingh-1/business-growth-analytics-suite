@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: business-growth-analytics-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python main.py && python scripts/data_cleaning.py && python scripts/sql_integration.py && python scripts/run_ml_pipeline.py"
+    startCommand: "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
