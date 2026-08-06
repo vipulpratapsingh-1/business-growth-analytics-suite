@@ -1,13 +1,14 @@
 """
-Automated GitHub API Uploader & Deployment Engine
+Automated GitHub API Uploader & Deployment Engine - Step 8
 Reads secure GITHUB_TOKEN from CLI argument or .env file, creates GitHub repository,
-and uploads all project files directly via GitHub REST API.
+and uploads all project files directly via GitHub REST API with retry handling.
 """
 
 import sys
 import os
 import json
 import base64
+import time
 from pathlib import Path
 import urllib.request
 import urllib.error
@@ -34,25 +35,36 @@ def load_env_variables():
                     env_vars[key.strip()] = val.strip().strip('"').strip("'")
     return env_vars
 
-def make_github_request(url, method="GET", data=None, token=None):
-    """Sends authenticated HTTP request to GitHub REST API."""
-    req = urllib.request.Request(url, method=method)
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("Accept", "application/vnd.github+json")
-    req.add_header("User-Agent", "Business-Growth-Analytics-Suite")
-    req.add_header("X-GitHub-Api-Version", "2022-11-28")
+def make_github_request(url, method="GET", data=None, token=None, retries=3):
+    """Sends authenticated HTTP request to GitHub REST API with exponential backoff retry."""
+    for attempt in range(retries):
+        req = urllib.request.Request(url, method=method)
+        req.add_header("Authorization", f"Bearer {token}")
+        req.add_header("Accept", "application/vnd.github+json")
+        req.add_header("User-Agent", "Business-Growth-Analytics-Suite")
+        req.add_header("X-GitHub-Api-Version", "2022-11-28")
 
-    body_bytes = None
-    if data:
-        req.add_header("Content-Type", "application/json")
-        body_bytes = json.dumps(data).encode("utf-8")
+        body_bytes = None
+        if data:
+            req.add_header("Content-Type", "application/json")
+            body_bytes = json.dumps(data).encode("utf-8")
 
-    try:
-        with urllib.request.urlopen(req, data=body_bytes) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8")
-        return {"error": True, "code": e.code, "message": err_msg}
+        try:
+            with urllib.request.urlopen(req, data=body_bytes, timeout=60) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8")
+            if e.code == 404:
+                return {"error": True, "code": 404, "message": err_msg}
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            return {"error": True, "code": e.code, "message": err_msg}
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            return {"error": True, "code": 500, "message": str(e)}
 
 def push_to_github():
     print("=" * 65)
@@ -111,7 +123,7 @@ def push_to_github():
             full_path = Path(root) / f
             rel_path = full_path.relative_to(config.BASE_DIR).as_posix()
             
-            # Skip large raw CSV files or python cache or workflows requiring special scopes
+            # Skip large raw CSV files or workflow permissions or pyc
             if rel_path.startswith("data/sales_data.csv") or rel_path.startswith(".github/workflows") or f.endswith(".pyc"):
                 continue
             
@@ -135,7 +147,7 @@ def push_to_github():
         sha = existing.get("sha") if not existing.get("error") else None
         
         payload = {
-            "message": f"Update {rel_path} for Render/Vercel production build",
+            "message": f"Update {rel_path} for production deployment",
             "content": content_b64,
             "branch": "main"
         }
