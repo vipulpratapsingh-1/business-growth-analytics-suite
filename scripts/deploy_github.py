@@ -1,6 +1,6 @@
 """
 Automated GitHub API Uploader & Deployment Engine
-Reads secure GITHUB_TOKEN from local .env file, creates GitHub repository,
+Reads secure GITHUB_TOKEN from CLI argument or .env file, creates GitHub repository,
 and uploads all project files directly via GitHub REST API.
 """
 
@@ -60,13 +60,12 @@ def push_to_github():
     print("=" * 65)
 
     env_vars = load_env_variables()
-    token = env_vars.get("GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
+    token = sys.argv[1] if len(sys.argv) > 1 else (os.getenv("GITHUB_TOKEN") or env_vars.get("GITHUB_TOKEN"))
     username = env_vars.get("GITHUB_USERNAME", "vipulpratapsingh-1")
     repo_name = env_vars.get("GITHUB_REPO", "business-growth-analytics-suite")
 
     if not token or token == "YOUR_PERSONAL_ACCESS_TOKEN_HERE":
-        print("\n❌ GITHUB_TOKEN not found in local .env file!")
-        print(f"Please add your token to: {ENV_FILE}")
+        print("\n❌ GITHUB_TOKEN not found!")
         sys.exit(1)
 
     print(f"[1/4] Authenticating with GitHub API as user: {username}...")
@@ -112,8 +111,8 @@ def push_to_github():
             full_path = Path(root) / f
             rel_path = full_path.relative_to(config.BASE_DIR).as_posix()
             
-            # Skip large raw CSV files or python cache
-            if rel_path.startswith("data/sales_data.csv") or f.endswith(".pyc"):
+            # Skip large raw CSV files or python cache or workflows requiring special scopes
+            if rel_path.startswith("data/sales_data.csv") or rel_path.startswith(".github/workflows") or f.endswith(".pyc"):
                 continue
             
             try:
@@ -136,7 +135,7 @@ def push_to_github():
         sha = existing.get("sha") if not existing.get("error") else None
         
         payload = {
-            "message": f"Deploy {rel_path} via automated pipeline",
+            "message": f"Update {rel_path} for Render/Vercel production build",
             "content": content_b64,
             "branch": "main"
         }
