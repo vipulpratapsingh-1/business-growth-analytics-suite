@@ -1,15 +1,15 @@
 # Multi-Stage Production Dockerfile for Business Growth Analytics Suite
 
-FROM python:3.10-slim as builder
+FROM python:3.10-slim
 
 WORKDIR /app
 
-# Prevent python from writing pyc files to disc
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -17,12 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy complete project source code
 COPY . .
-
-# Run initial pipeline tasks to ensure database and ML models are pre-compiled
-RUN python main.py && \
-    python scripts/data_cleaning.py && \
-    python scripts/sql_integration.py && \
-    python scripts/run_ml_pipeline.py
 
 EXPOSE 8000
 
