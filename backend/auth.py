@@ -10,7 +10,7 @@ from typing import Optional, Dict
 import jwt
 from fastapi import HTTPException, Security, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 import config
 
@@ -39,17 +39,17 @@ USERS_DB: Dict[str, dict] = {
 }
 
 class UserSignupSchema(BaseModel):
-    email: EmailStr
+    email: str
     full_name: str
     password: str
     role: str = "Analyst"
 
 class UserLoginSchema(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class ForgotPasswordSchema(BaseModel):
-    email: EmailStr
+    email: str
 
 class RefreshTokenSchema(BaseModel):
     refresh_token: str
